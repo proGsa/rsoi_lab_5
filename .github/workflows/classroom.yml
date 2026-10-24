@@ -2,6 +2,11 @@ name: GitHub Classroom Workflow
 on:
   push:
     branches: [ master ]
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
 jobs:
   build:
     name: Autograding
@@ -61,6 +66,14 @@ jobs:
           context: ./v4/gateway_service
           push: true
           tags: progsa/gateway-service:${{ github.sha }}
+      
+      - name: Install cloudlogin
+        run: |
+          curl -fsSLO \
+            https://github.com/cloud-ru-tech/cloudlogin/releases/latest/download/cloudlogin_Linux_amd64.tar.gz
+          tar -xzf cloudlogin_Linux_amd64.tar.gz
+          sudo install -m 0755 cloudlogin /usr/local/bin/cloudlogin
+          cloudlogin help
 
       - name: Configure kubectl
         run: |
