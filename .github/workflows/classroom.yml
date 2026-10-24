@@ -135,6 +135,9 @@ jobs:
             -n test --wait --timeout 3m
 
       - name: Deploy services
+        env:
+          NAMESPACE: test
+          IMAGE_TAG: ${{ github.sha }}
         timeout-minutes: 20
         run: |
           for service in library rating reservation gateway; do
