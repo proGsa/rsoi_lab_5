@@ -138,11 +138,30 @@ jobs:
         timeout-minutes: 20
         run: |
           for service in library rating reservation gateway; do
-            helm upgrade --install "$service" k8s/service \
-              -n test \
+            echo "=== Deploying $service ==="
+
+            if ! helm upgrade --install "$service" k8s/service \
+              -n "$NAMESPACE" \
               -f "k8s/values/$service.yaml" \
-              --set image.tag="${{ github.sha }}" \
-              --wait --timeout 5m
+              --set image.tag="$IMAGE_TAG" \
+              --wait --timeout 5m; then
+
+              echo "=== Pods ==="
+              kubectl get pods -n "$NAMESPACE" -o wide
+
+              echo "=== Deployments ==="
+              kubectl get deployments -n "$NAMESPACE"
+
+              echo "=== Recent events ==="
+              kubectl get events -n "$NAMESPACE" \
+                --sort-by=.metadata.creationTimestamp
+
+              echo "=== Library pod description ==="
+              kubectl describe pods -n "$NAMESPACE" \
+                -l app.kubernetes.io/name=library
+
+              exit 1
+            fi
           done
 
       - name: Wait for services
