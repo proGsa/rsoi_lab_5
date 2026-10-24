@@ -17,13 +17,18 @@
 							"script": {
 								"exec": [
 									"pm.test(\"Получить токен\", () => {",
-									"    pm.response.to.have.status(200)",
-									"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.contains(\"application/json\");",
+									"    pm.response.to.have.status(200);",
+									"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.contain(\"application/json\");",
 									"",
 									"    const response = pm.response.json();",
-									"    pm.expect(response.access_token).not.be.empty",
-									"    pm.collectionVariables.set(\"authorizationToken\", response.access_token)",
-									"})"
+									"    pm.expect(response.access_token).not.be.empty;",
+									"    pm.collectionVariables.set(\"authorizationToken\", response.access_token);",
+									"",
+									"    const payloadPart = response.access_token.split('.')[1];",
+									"    const payload = JSON.parse(atob(payloadPart.replace(/-/g, '+').replace(/_/g, '/')));",
+									"    console.log(\"JWT sub:\", payload.sub);",
+									"    console.log(\"JWT username:\", payload.username);",
+									"});"
 								],
 								"type": "text/javascript"
 							}
