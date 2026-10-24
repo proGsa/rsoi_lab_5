@@ -75,29 +75,79 @@ jobs:
           sudo install -m 0755 cloudlogin /usr/local/bin/cloudlogin
           cloudlogin help
 
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v4.3.0
       
-      - name: Configure kubectl
+      - name: Configure Kubernetes
         env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+          KUBECONFIG_RAW: ${{ secrets.KUBECONFIG }}
           CLOUDRU_KEY_ID: ${{ secrets.CLOUDRU_KEY_ID }}
           CLOUDRU_SECRET_ID: ${{ secrets.CLOUDRU_SECRET_ID }}
         run: |
           mkdir -p "$HOME/.kube"
-          printf '%s' "$KUBECONFIG_B64" | base64 --decode > "$HOME/.kube/config"
+          printf '%s\n' "$KUBECONFIG_RAW" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
-          kubectl get nodes
 
-      - name: Deploy with Helm
+          ruby -ryaml -e '
+            path = ENV.fetch("HOME") + "/.kube/config"
+            config = YAML.load_file(path)
+
+            config.fetch("users").each do |entry|
+              exec_config = entry.dig("user", "exec")
+              next unless exec_config && exec_config["command"] == "cloudlogin"
+
+              exec_config["env"] ||= []
+              %w[CLOUDRU_KEY_ID CLOUDRU_SECRET_ID].each do |name|
+                exec_config["env"].reject! { |item| item["name"] == name }
+              end
+
+              %w[CLOUDRU_KEY_ID CLOUDRU_SECRET_ID].each do |name|
+                exec_config["env"] << {
+                  "name" => name,
+                  "value" => ENV.fetch(name)
+                }
+              end
+            end
+
+            File.write(path, config.to_yaml)
+          '
+
+          chmod 600 "$HOME/.kube/config"
+          export KUBECONFIG="$HOME/.kube/config"
+          kubectl cluster-info
+          kubectl get nodes
+          echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
+
+      - name: Create test namespace
+        run: kubectl create namespace test --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy PostgreSQL
         run: |
-          helm upgrade --install library-system ./helm/library-system \
-            --set library.image.repository=progsa/library-service \
-            --set library.image.tag=${{ github.sha }} \
-            --set reservation.image.repository=progsa/reservation-service \
-            --set reservation.image.tag=${{ github.sha }} \
-            --set rating.image.repository=progsa/rating-service \
-            --set rating.image.tag=${{ github.sha }} \
-            --set gateway.image.repository=progsa/gateway-service \
-            --set gateway.image.tag=${{ github.sha }}
+          helm upgrade --install postgres k8s/postgres \
+            -n test --wait --timeout 3m
+
+      - name: Deploy services
+        timeout-minutes: 20
+        run: |
+          for service in library rating reservation gateway; do
+            helm upgrade --install "$service" k8s/service \
+              -n test \
+              -f "k8s/values/$service.yaml" \
+              --set image.tag="${{ github.sha }}" \
+              --wait --timeout 5m
+          done
+
+      - name: Wait for services
+        run: |
+          for service in library rating reservation gateway; do
+            kubectl rollout status deployment/"$service" \
+              -n test --timeout=180s
+          done
 
       - name: Run API Tests
         uses: matt-ball/newman-action@master
