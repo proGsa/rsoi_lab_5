@@ -76,6 +76,9 @@ jobs:
           cloudlogin help
 
       - name: Configure kubectl
+        env:
+          CLOUDRU_KEY_ID: ${{ secrets.CLOUDRU_KEY_ID }}
+          CLOUDRU_SECRET_ID: ${{ secrets.CLOUDRU_SECRET_ID }}
         run: |
           mkdir -p "$HOME/.kube"
           echo "${{ secrets.KUBECONFIG }}" > "$HOME/.kube/config"
