@@ -75,14 +75,17 @@ jobs:
           sudo install -m 0755 cloudlogin /usr/local/bin/cloudlogin
           cloudlogin help
 
+      
       - name: Configure kubectl
         env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
           CLOUDRU_KEY_ID: ${{ secrets.CLOUDRU_KEY_ID }}
           CLOUDRU_SECRET_ID: ${{ secrets.CLOUDRU_SECRET_ID }}
         run: |
           mkdir -p "$HOME/.kube"
-          echo "${{ secrets.KUBECONFIG }}" > "$HOME/.kube/config"
+          printf '%s\n' "$KUBECONFIG_DATA" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          kubectl config get-contexts
           kubectl get nodes
 
       - name: Deploy with Helm
