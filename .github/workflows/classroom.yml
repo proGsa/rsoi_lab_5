@@ -167,7 +167,11 @@ jobs:
               exit 1
             fi
           done
-
+      - name: Deploy Ingress
+        run: |
+          kubectl apply -f k8s/ingress.yaml
+          kubectl get ingress -n test
+          
       - name: Wait for services
         run: |
           for service in library rating reservation gateway; do
