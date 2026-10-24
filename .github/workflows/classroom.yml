@@ -85,12 +85,17 @@ jobs:
       
       - name: Configure Kubernetes
         env:
-          KUBECONFIG_RAW: ${{ secrets.KUBECONFIG }}
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
           CLOUDRU_KEY_ID: ${{ secrets.CLOUDRU_KEY_ID }}
           CLOUDRU_SECRET_ID: ${{ secrets.CLOUDRU_SECRET_ID }}
         run: |
+          set -euo pipefail
+
           mkdir -p "$HOME/.kube"
-          printf '%s\n' "$KUBECONFIG_RAW" > "$HOME/.kube/config"
+
+          printf '%s' "$KUBECONFIG_B64" \
+            | base64 --decode > "$HOME/.kube/config"
+
           chmod 600 "$HOME/.kube/config"
 
           ruby -ryaml -e '
@@ -98,16 +103,14 @@ jobs:
             config = YAML.load_file(path)
 
             config.fetch("users").each do |entry|
-              exec_config = entry.dig("user", "exec")
-              next unless exec_config && exec_config["command"] == "cloudlogin"
+              exec = entry.dig("user", "exec")
+              next unless exec && exec["command"] == "cloudlogin"
 
-              exec_config["env"] ||= []
-              %w[CLOUDRU_KEY_ID CLOUDRU_SECRET_ID].each do |name|
-                exec_config["env"].reject! { |item| item["name"] == name }
-              end
+              exec["env"] ||= []
 
               %w[CLOUDRU_KEY_ID CLOUDRU_SECRET_ID].each do |name|
-                exec_config["env"] << {
+                exec["env"].reject! { |item| item["name"] == name }
+                exec["env"] << {
                   "name" => name,
                   "value" => ENV.fetch(name)
                 }
@@ -118,10 +121,10 @@ jobs:
           '
 
           chmod 600 "$HOME/.kube/config"
-          export KUBECONFIG="$HOME/.kube/config"
-          kubectl cluster-info
-          kubectl get nodes
           echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
+
+          kubectl config current-context
+          kubectl get nodes
 
       - name: Create test namespace
         run: kubectl create namespace test --dry-run=client -o yaml | kubectl apply -f -
