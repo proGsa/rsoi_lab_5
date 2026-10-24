@@ -160,8 +160,9 @@ jobs:
                 --sort-by=.metadata.creationTimestamp
 
               echo "=== Library pod description ==="
-              kubectl describe pods -n "$NAMESPACE" \
-                -l app.kubernetes.io/name=library
+              kubectl describe pods -n "$NAMESPACE" || true
+              kubectl logs deployment/rating -n "$NAMESPACE" --tail=100 || true
+              kubectl logs deployment/rating -n "$NAMESPACE" --previous --tail=100 || true
 
               exit 1
             fi
