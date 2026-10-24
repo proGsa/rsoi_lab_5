@@ -33,7 +33,7 @@ def get_rating(user: dict = Depends(get_current_user), db: Session = Depends(get
     return rating
 
 @app.patch("/api/v1/rating")
-def update_rating(body: RatingUpdate, user: dict = Depends(get_current_user),, db: Session = Depends(get_db)):
+def update_rating(body: RatingUpdate, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     username = user["sub"]
     rating = (
         db.query(models.Rating)
